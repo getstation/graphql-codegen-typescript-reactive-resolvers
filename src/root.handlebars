@@ -1,0 +1,90 @@
+{{{ importFromGraphQL }}}
+
+{{{ importFromRxJS }}}
+
+{{{ importMappers types }}}
+
+{{{ importContext }}}
+
+export type Resolver<Result, Parent = {}, Context = {}, Args = {}> = (
+  parent: Parent,
+  args: Args,
+  context: Context,
+  info: GraphQLResolveInfo
+) => Observable<Result> | Promise<Result> | Result;
+
+export interface ISubscriptionResolverObject<Result, Parent, Context, Args> {
+  subscribe<R = Result, P = Parent>(
+    parent: P,
+    args: Args,
+    context: Context,
+    info: GraphQLResolveInfo
+  ): AsyncIterator<R | Result> | Promise<AsyncIterator<R | Result>>;
+  resolve?<R = Result, P = Parent>(
+    parent: P,
+    args: Args,
+    context: Context,
+    info: GraphQLResolveInfo
+  ): R | Result | Promise<R | Result>;
+}
+
+export type SubscriptionResolver<Result, Parent = {}, Context = {}, Args = {}> =
+  | ((...args: any[]) => ISubscriptionResolverObject<Result, Parent, Context, Args>)
+  | ISubscriptionResolverObject<Result, Parent, Context, Args>;
+
+export type TypeResolveFn<Types, Parent = {}, Context = {}> = (
+  parent: Parent,
+  context: Context,
+  info: GraphQLResolveInfo
+) => Maybe<Types>;
+
+export type NextResolverFn<T> = () => Promise<T>;
+
+export type DirectiveResolverFn<TResult, TArgs = {}, TContext = {}> = (
+  next: NextResolverFn<TResult>,
+  source: any,
+  args: TArgs,
+  context: TContext,
+  info: GraphQLResolveInfo,
+) => TResult | Promise<TResult>;
+
+{{#each types}}
+{{~> resolver }}
+{{/each}}
+
+{{#each interfaces}}
+{{~> resolveType }}
+{{/each}}
+
+{{#each unions}}
+{{~> resolveType }}
+{{/each}}
+
+{{#each definedDirectives}}
+{{~> directive}}
+{{/each}}
+
+{{#each scalars}}
+{{~> scalar}}
+{{/each}}
+
+export interface IResolvers<Context = {{{ getContext }}}> {
+  {{#each types}}
+    {{ convert name 'typeNames'}}{{#unless @root.config.strict}}?{{/unless}}: {{ convert name 'typeNames'}}Resolvers{{#unless @root.config.noNamespaces}}.Resolvers{{/unless}}<Context>;
+  {{/each}}
+  {{#each interfaces}}
+    {{ convert name 'typeNames'}}{{#unless @root.config.strict}}?{{/unless}}: {{ convert name 'typeNames'}}Resolvers{{#unless @root.config.noNamespaces}}.Resolvers{{/unless}}<Context>;
+  {{/each}}
+  {{#each unions}}
+    {{ convert name 'typeNames'}}{{#unless @root.config.strict}}?{{/unless}}: {{ convert name 'typeNames'}}Resolvers{{#unless @root.config.noNamespaces}}.Resolvers{{/unless}}<Context>;
+  {{/each}}
+  {{#each scalars}}
+    {{ convert name 'typeNames'}}{{#unless @root.config.strict}}?{{/unless}}: GraphQLScalarType;
+  {{/each}}
+}
+
+export interface IDirectiveResolvers<Result> {
+  {{#each definedDirectives}}
+    {{ name }}{{#unless @root.config.strict}}?{{/unless}}: {{ convert name 'typeNames'}}DirectiveResolver<Result>;
+  {{/each}}
+}

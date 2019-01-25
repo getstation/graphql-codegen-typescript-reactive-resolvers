@@ -1,0 +1,50 @@
+{
+  "name": "graphql-codegen-typescript-reactive-resolvers",
+  "version": "1.0.0",
+  "description": "graphql-codegen-cli template for TypeScript typings of reactive resolvers",
+  "repository": "git@github.com:getstation/graphql-codegen-typescript-reactive-resolvers.git",
+  "license": "MIT",
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "codegen-templates-scripts build",
+    "test": "codegen-templates-scripts test",
+    "pretest": "npm run build"
+  },
+  "dependencies": {
+    "graphql-codegen-plugin-helpers": "0.16.0",
+    "graphql-codegen-typescript-common": "0.16.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^23.3.13",
+    "codegen-templates-scripts": "0.16.0",
+    "graphql": "14.1.1",
+    "graphql-codegen-core": "0.16.0",
+    "graphql-codegen-plugin-handlebars-helpers": "0.16.0",
+    "jest": "^23.6.0",
+    "jest-cli": "^23.6.0"
+  },
+  "main": "./dist/index.js",
+  "typings": "dist/index.d.ts",
+  "typescript": {
+    "definition": "dist/index.d.ts"
+  },
+  "jest": {
+    "globals": {
+      "ts-jest": {
+        "enableTsDiagnostics": false
+      }
+    },
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ]
+  }
+}
