@@ -9,7 +9,7 @@
 
 Run `gql-gen` as usual with this config:
 
-```js
+```
 schema: schema.json
 overwrite: true
 generates:
