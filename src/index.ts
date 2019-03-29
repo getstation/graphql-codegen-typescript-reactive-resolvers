@@ -1,47 +1,190 @@
-import { TypeScriptCommonConfig, initCommonTemplate } from 'graphql-codegen-typescript-common';
-import { PluginFunction, DocumentFile } from 'graphql-codegen-core';
-import { GraphQLSchema } from 'graphql';
-import * as Handlebars from 'handlebars';
-import * as rootTemplate from './root.handlebars';
-import * as resolver from './resolver.handlebars';
-import * as resolveType from './resolve-type.handlebars';
-import * as directive from './directive.handlebars';
-import * as scalar from './scalar.handlebars';
-import { getFieldResolverName, getFieldResolver, getFieldType, getTypenames, importFromGraphQL, importFromRxJS } from './helpers';
-import { importMappers } from './import-mappers';
-import { importContext, getContext } from './context';
-import { getParentType, getParentTypes } from './parent-type';
+import { RawResolversConfig } from '@graphql-codegen/visitor-plugin-common';
+import { Types, PluginFunction } from '@graphql-codegen/plugin-helpers';
+import { isScalarType, parse, printSchema, visit, GraphQLSchema } from 'graphql';
+import { TypeScriptResolversVisitor } from './visitor';
 
-export interface TypeScriptServerResolversConfig extends TypeScriptCommonConfig {
-  strict?: boolean;
-  noNamespaces?: boolean;
-  contextType?: string;
-  mappers?: { [name: string]: string };
-  defaultMapper?: string;
-  fieldResolverNamePrefix?: string;
+export interface TypeScriptResolversPluginConfig extends RawResolversConfig {
+  /**
+   * @name immutableTypes
+   * @type boolean
+   * @description Generates immutable types by adding `readonly` to properties and uses `ReadonlyArray`.
+   * @default false
+   *
+   * @example
+   * ```yml
+   * generates:
+   * path/to/file.ts:
+   *  plugins:
+   *    - typescript
+   *    - typescript-resolvers
+   *  config:
+   *    immutableTypes: true
+   * ```
+   */
+  immutableTypes?: boolean;
+  /**
+   * @name useIndexSignature
+   * @type boolean
+   * @description Adds an index signature to any generates resolver.
+   * @default false
+   *
+   * @example
+   * ```yml
+   * generates:
+   * path/to/file.ts:
+   *  plugins:
+   *    - typescript
+   *    - typescript-resolvers
+   *  config:
+   *    useIndexSignature: true
+   * ```
+   */
+  useIndexSignature?: boolean;
+  /**
+   * @name showUnusedMappers
+   * @type boolean
+   * @description Warns about unused mappers.
+   * @default true
+   *
+   * @example
+   * ```yml
+   * generates:
+   * path/to/file.ts:
+   *  plugins:
+   *    - typescript
+   *    - typescript-resolvers
+   *  config:
+   *    showUnusedMappers: true
+   * ```
+   */
+  showUnusedMappers?: boolean;
+  /**
+   * @name noSchemaStitching
+   * @type boolean
+   * @description Disables Schema Stitching support
+   * @default false
+   * @warning The default behavior will be reversed in the next major release. Support for Schema Stitching will be disabled by default.
+   *
+   * @example
+   * ```yml
+   * generates:
+   * path/to/file.ts:
+   *  plugins:
+   *    - typescript
+   *    - typescript-resolvers
+   *  config:
+   *    noSchemaStitching: true
+   * ```
+   */
+  noSchemaStitching?: boolean;
 }
 
-export const plugin: PluginFunction<TypeScriptServerResolversConfig> = async (
-  schema: GraphQLSchema,
-  documents: DocumentFile[],
-  config: TypeScriptServerResolversConfig
-): Promise<string> => {
-  const { templateContext, convert } = initCommonTemplate(Handlebars, schema, config);
-  Handlebars.registerPartial('resolver', resolver);
-  Handlebars.registerPartial('resolveType', resolveType);
-  Handlebars.registerPartial('directive', directive);
-  Handlebars.registerPartial('scalar', scalar);
-  Handlebars.registerHelper('getFieldResolverName', getFieldResolverName(convert, config));
-  Handlebars.registerHelper('getFieldResolver', getFieldResolver(convert));
-  Handlebars.registerHelper('getTypenames', getTypenames);
-  Handlebars.registerHelper('getParentType', getParentType(convert));
-  Handlebars.registerHelper('getParentTypes', getParentTypes(convert));
-  Handlebars.registerHelper('getFieldType', getFieldType(convert));
-  Handlebars.registerHelper('importMappers', importMappers);
-  Handlebars.registerHelper('importContext', importContext);
-  Handlebars.registerHelper('importFromGraphQL', importFromGraphQL);
-  Handlebars.registerHelper('importFromRxJS', importFromRxJS);
-  Handlebars.registerHelper('getContext', getContext);
+export const plugin: PluginFunction<TypeScriptResolversPluginConfig> = (schema: GraphQLSchema, documents: Types.DocumentFile[], config: TypeScriptResolversPluginConfig) => {
+  const imports = ['GraphQLResolveInfo'];
+  const showUnusedMappers = typeof config.showUnusedMappers === 'boolean' ? config.showUnusedMappers : true;
+  const noSchemaStitching = typeof config.noSchemaStitching === 'boolean' ? config.noSchemaStitching : false;
+  const hasScalars = Object.values(schema.getTypeMap())
+    .filter(t => t.astNode)
+    .some(isScalarType);
 
-  return Handlebars.compile(rootTemplate)(templateContext);
+  if (config.noSchemaStitching === false) {
+    console['warn'](`The default behavior of 'noSchemaStitching' will be reversed in the next major release. Support for Schema Stitching will be disabled by default.`);
+  }
+
+  if (hasScalars) {
+    imports.push('GraphQLScalarType', 'GraphQLScalarTypeConfig');
+  }
+
+  const indexSignature = config.useIndexSignature ? ['export type WithIndex<TObject> = TObject & Record<string, any>;', 'export type ResolversObject<TObject> = WithIndex<TObject>;'].join('\n') : '';
+
+  const visitor = new TypeScriptResolversVisitor(config, schema);
+
+  const stitchingResolverType = `
+export type StitchingResolver<TResult, TParent, TContext, TArgs> = {
+  fragment: string;
+  resolve: ResolverFn<TResult, TParent, TContext, TArgs>;
+};
+`;
+  const resolverType = `export type Resolver<TResult, TParent = {}, TContext = {}, TArgs = {}> =`;
+  const resolverFnUsage = `ResolverFn<TResult, TParent, TContext, TArgs>`;
+  const stitchingResolverUsage = `StitchingResolver<TResult, TParent, TContext, TArgs>`;
+
+  let resolverDefs: string;
+
+  if (noSchemaStitching) {
+    // Resolver = ResolverFn;
+    resolverDefs = `${resolverType} ${resolverFnUsage};`;
+  } else {
+    // StitchingResolver
+    // Resolver =
+    // | ResolverFn
+    // | StitchingResolver;
+    resolverDefs = [stitchingResolverType, resolverType, `  | ${resolverFnUsage}`, `  | ${stitchingResolverUsage};`].join('\n');
+  }
+
+  const header = `
+import { ${imports.join(', ')} } from 'graphql';
+import { Observable } from 'rxjs';
+
+${indexSignature}
+
+export type ResolverFn<TResult, TParent, TContext, TArgs> = (
+  parent: TParent,
+  args: TArgs,
+  context: TContext,
+  info: GraphQLResolveInfo
+) =>  Observable<TResult> | Promise<TResult> | TResult;
+
+${resolverDefs}
+
+export type SubscriptionSubscribeFn<TResult, TParent, TContext, TArgs> = (
+  parent: TParent,
+  args: TArgs,
+  context: TContext,
+  info: GraphQLResolveInfo
+) => AsyncIterator<TResult> | Promise<AsyncIterator<TResult>>;
+
+export type SubscriptionResolveFn<TResult, TParent, TContext, TArgs> = (
+  parent: TParent,
+  args: TArgs,
+  context: TContext,
+  info: GraphQLResolveInfo
+) => TResult | Promise<TResult>;
+
+export interface SubscriptionResolverObject<TResult, TParent, TContext, TArgs> {
+  subscribe: SubscriptionSubscribeFn<TResult, TParent, TContext, TArgs>;
+  resolve?: SubscriptionResolveFn<TResult, TParent, TContext, TArgs>;
+}
+
+export type SubscriptionResolver<TResult, TParent = {}, TContext = {}, TArgs = {}> =
+  | ((...args: any[]) => SubscriptionResolverObject<TResult, TParent, TContext, TArgs>)
+  | SubscriptionResolverObject<TResult, TParent, TContext, TArgs>;
+
+export type TypeResolveFn<TTypes, TParent = {}, TContext = {}> = (
+  parent: TParent,
+  context: TContext,
+  info: GraphQLResolveInfo
+) => Maybe<TTypes>;
+
+export type NextResolverFn<T> = () => Promise<T>;
+
+export type DirectiveResolverFn<TResult = {}, TParent = {}, TContext = {}, TArgs = {}> = (
+  next: NextResolverFn<TResult>,
+  parent: TParent,
+  args: TArgs,
+  context: TContext,
+  info: GraphQLResolveInfo
+) => TResult | Promise<TResult>;
+`;
+
+  const printedSchema = printSchema(schema);
+  const astNode = parse(printedSchema);
+  const visitorResult = visit(astNode, { leave: visitor });
+  const { getRootResolver, getAllDirectiveResolvers, mappersImports, unusedMappers } = visitor;
+
+  if (showUnusedMappers && unusedMappers.length) {
+    console['warn'](`Unused mappers: ${unusedMappers.join(',')}`);
+  }
+
+  return [...mappersImports, header, ...visitorResult.definitions.filter(d => typeof d === 'string'), getRootResolver(), getAllDirectiveResolvers()].join('\n');
 };
