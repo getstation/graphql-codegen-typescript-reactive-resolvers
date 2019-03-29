@@ -1,6 +1,6 @@
 {
   "name": "graphql-codegen-typescript-reactive-resolvers",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "graphql-codegen-cli template for TypeScript typings of reactive resolvers",
   "repository": "git@github.com:getstation/graphql-codegen-typescript-reactive-resolvers.git",
   "license": "MIT",
