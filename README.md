@@ -5,6 +5,8 @@
 
 `npm install graphql-codegen-typescript-reactive-resolvers --save-dev`
 
+⚠️ It overrides the `resolverTypeWrapperSignature` config
+
 ## Usage
 
 Run `gql-gen` as usual with this config:

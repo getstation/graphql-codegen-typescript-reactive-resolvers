@@ -59,7 +59,20 @@ export type MyUnion = MyType | MyOtherType;
 export type WithIndex<TObject> = TObject & Record<string, any>;
 export type ResolversObject<TObject> = WithIndex<TObject>;
 
-export type ResolverTypeWrapper<T> = Promise<T> | T;
+export type DeepObservable<T> = [T] extends [Function]
+  ? T : [T] extends [Array<infer U>]
+    ? _DeepObservableArray<U>
+    : [T] extends [object]
+      ? _DeepObservableObject<T>
+      : T | Observable<T> | Promise<T>;
+
+export interface _DeepObservableArray<T> extends ReadonlyArray<DeepObservable<T>> {}
+
+export type _DeepObservableObject<T> = {
+  [P in keyof T]: DeepObservable<T[P]>;
+};
+
+export type ResolverTypeWrapper<T> = DeepObservable<T> | Promise<T> | T;
 
 export type Resolver<TResult, TParent = {}, TContext = {}, TArgs = {}> = ResolverFn<TResult, TParent, TContext, TArgs>;
 
@@ -106,7 +119,7 @@ export type TypeResolveFn<TTypes, TParent = {}, TContext = {}> = (
   parent: TParent,
   context: TContext,
   info: GraphQLResolveInfo
-) => Maybe<TTypes> | Promise<Maybe<TTypes>>;
+) => Maybe<TTypes> | Promise<Maybe<TTypes>> | Observable<Maybe<TTypes>>;
 
 export type IsTypeOfResolverFn<T = {}> = (obj: T, info: GraphQLResolveInfo) => boolean | Promise<boolean>;
 
@@ -240,7 +253,20 @@ export type RequireFields<T, K extends keyof T> = { [X in Exclude<keyof T, K>]?:
 export type WithIndex<TObject> = TObject & Record<string, any>;
 export type ResolversObject<TObject> = WithIndex<TObject>;
 
-export type ResolverTypeWrapper<T> = Promise<T> | T;
+export type DeepObservable<T> = [T] extends [Function]
+  ? T : [T] extends [Array<infer U>]
+    ? _DeepObservableArray<U>
+    : [T] extends [object]
+      ? _DeepObservableObject<T>
+      : T | Observable<T> | Promise<T>;
+
+export interface _DeepObservableArray<T> extends ReadonlyArray<DeepObservable<T>> {}
+
+export type _DeepObservableObject<T> = {
+  [P in keyof T]: DeepObservable<T[P]>;
+};
+
+export type ResolverTypeWrapper<T> = DeepObservable<T> | Promise<T> | T;
 
 export type Resolver<TResult, TParent = {}, TContext = {}, TArgs = {}> = ResolverFn<TResult, TParent, TContext, TArgs>;
 
@@ -287,7 +313,7 @@ export type TypeResolveFn<TTypes, TParent = {}, TContext = {}> = (
   parent: TParent,
   context: TContext,
   info: GraphQLResolveInfo
-) => Types.Maybe<TTypes> | Promise<Types.Maybe<TTypes>>;
+) => Types.Maybe<TTypes> | Promise<Types.Maybe<TTypes>> | Observable<Types.Maybe<TTypes>>;
 
 export type IsTypeOfResolverFn<T = {}> = (obj: T, info: GraphQLResolveInfo) => boolean | Promise<boolean>;
 
@@ -465,7 +491,20 @@ export type MyUnion = MyType | MyOtherType;
 export type WithIndex<TObject> = TObject & Record<string, any>;
 export type ResolversObject<TObject> = WithIndex<TObject>;
 
-export type ResolverTypeWrapper<T> = Promise<T> | T;
+export type DeepObservable<T> = [T] extends [Function]
+  ? T : [T] extends [Array<infer U>]
+    ? _DeepObservableArray<U>
+    : [T] extends [object]
+      ? _DeepObservableObject<T>
+      : T | Observable<T> | Promise<T>;
+
+export interface _DeepObservableArray<T> extends ReadonlyArray<DeepObservable<T>> {}
+
+export type _DeepObservableObject<T> = {
+  [P in keyof T]: DeepObservable<T[P]>;
+};
+
+export type ResolverTypeWrapper<T> = DeepObservable<T> | Promise<T> | T;
 
 export type Resolver<TResult, TParent = {}, TContext = {}, TArgs = {}> = ResolverFn<TResult, TParent, TContext, TArgs>;
 
@@ -512,7 +551,7 @@ export type TypeResolveFn<TTypes, TParent = {}, TContext = {}> = (
   parent: TParent,
   context: TContext,
   info?: GraphQLResolveInfo
-) => Maybe<TTypes> | Promise<Maybe<TTypes>>;
+) => Maybe<TTypes> | Promise<Maybe<TTypes>> | Observable<Maybe<TTypes>>;
 
 export type IsTypeOfResolverFn<T = {}> = (obj: T, info?: GraphQLResolveInfo) => boolean | Promise<boolean>;
 

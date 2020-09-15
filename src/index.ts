@@ -134,7 +134,20 @@ export type ResolverFn<TResult, TParent, TContext, TArgs> = (
 
   const header = `${indexSignature}
 
-${visitor.getResolverTypeWrapperSignature()}
+export type DeepObservable<T> = [T] extends [Function]
+  ? T : [T] extends [Array<infer U>]
+    ? _DeepObservableArray<U>
+    : [T] extends [object]
+      ? _DeepObservableObject<T>
+      : T | Observable<T> | Promise<T>;
+
+export interface _DeepObservableArray<T> extends ReadonlyArray<DeepObservable<T>> {}
+
+export type _DeepObservableObject<T> = {
+  [P in keyof T]: DeepObservable<T[P]>;
+};
+
+export type ResolverTypeWrapper<T> = DeepObservable<T> | Promise<T> | T;
 
 ${defsToInclude.join('\n')}
 
@@ -174,7 +187,7 @@ export type TypeResolveFn<TTypes, TParent = {}, TContext = {}> = (
   parent: TParent,
   context: TContext,
   info${optionalSignForInfoArg}: GraphQLResolveInfo
-) => ${namespacedImportPrefix}Maybe<TTypes> | Promise<${namespacedImportPrefix}Maybe<TTypes>>;
+) => ${namespacedImportPrefix}Maybe<TTypes> | Promise<${namespacedImportPrefix}Maybe<TTypes>> | Observable<${namespacedImportPrefix}Maybe<TTypes>>;
 
 export type IsTypeOfResolverFn<T = {}> = (obj: T, info${optionalSignForInfoArg}: GraphQLResolveInfo) => boolean | Promise<boolean>;
 
